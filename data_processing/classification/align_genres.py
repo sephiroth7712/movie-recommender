@@ -2,12 +2,13 @@ import pandas as pd
 import ast
 from collections import Counter
 from difflib import get_close_matches
+from config import *
 
 
 def load_and_process_data(min_frequency=1000):
     # Load both datasets
-    genre_df = pd.read_csv("./processed_data/processed_genre_data.csv")
-    movies_df = pd.read_csv("./processed_data/processed_movies.csv")
+    genre_df = pd.read_csv(DATASETS_PROCESSED + "/processed_genre_data.csv")
+    movies_df = pd.read_csv(DATASETS_PROCESSED + "/processed_movies.csv")
 
     # Convert string representation of list to actual list for genre_df
     genre_df["genres"] = genre_df["genres"].apply(ast.literal_eval)
@@ -144,7 +145,9 @@ def load_and_process_data(min_frequency=1000):
         "num_genres",
         "genres_string",
     ]
-    genre_df[output_columns].to_csv("aligned_genre_data.csv", index=False)
+    genre_df[output_columns].to_csv(
+        DATASETS_BASE + "/aligned_genre_data.csv", index=False
+    )
 
     return genre_df, movies_df, original_genre_dist, new_genre_dist
 

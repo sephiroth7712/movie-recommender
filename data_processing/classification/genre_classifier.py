@@ -14,6 +14,7 @@ from nltk.stem import WordNetLemmatizer
 import re
 import pickle
 from typing import List, Tuple, Dict
+from config import *
 
 class MovieGenreClassifier:
     def __init__(self, max_features: int = 5000):
@@ -189,7 +190,7 @@ class MovieGenreClassifier:
 # Example usage
 if __name__ == "__main__":
     # Read the dataset
-    df = pd.read_csv("./datasets/processed_data/aligned_genre_data.csv")
+    df = pd.read_csv(DATASETS_PROCESSED + "/aligned_genre_data.csv")
     
     # Initialize and train the classifier
     classifier = MovieGenreClassifier(max_features=5000)

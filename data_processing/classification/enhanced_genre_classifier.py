@@ -15,6 +15,7 @@ import re
 import pickle
 from typing import List, Tuple, Dict
 from sklearn.calibration import CalibratedClassifierCV
+from config import *
 
 class EnhancedMovieGenreClassifier:
     def __init__(self, max_features: int = 5000):
@@ -268,7 +269,7 @@ class EnhancedMovieGenreClassifier:
 # Example usage
 if __name__ == "__main__":
     # Read the dataset
-    df = pd.read_csv("./datasets/processed_data/aligned_genre_data.csv")
+    df = pd.read_csv(DATASETS_PROCESSED + "/aligned_genre_data.csv")
     
     # Initialize and train the classifier
     classifier = EnhancedMovieGenreClassifier(max_features=5000)
