@@ -1,0 +1,5 @@
+DATASETS_BASE = "../datasets"
+
+DATASETS_RAW = DATASETS_BASE + "/raw"
+
+DATASETS_PROCESSED = DATASETS_BASE + "/processed_data"

@@ -1,7 +1,7 @@
 from genre_classifier import MovieGenreClassifier
 from enhanced_genre_classifier import EnhancedMovieGenreClassifier
 
-plot = "Marty McFly, a 17-year-old high school student, is accidentally sent 30 years into the past in a time-traveling DeLorean invented by his close friend, the maverick scientist Doc Brown."
+plot = "A cyborg assassin from the future attempts to find and kill a young woman who is destined to give birth to a warrior that will lead a resistance to save humankind from extinction."
 
 mgc = MovieGenreClassifier()
 cls0 = mgc.load_model("./models/genre_classifier_model.pkl")
