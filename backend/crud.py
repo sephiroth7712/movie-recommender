@@ -9,13 +9,16 @@ from passlib.context import CryptContext
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 # Hash password
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
+
 # Verify password
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 
 # Create a new user
 async def create_user(db: AsyncSession, user: UserCreate):
@@ -29,6 +32,7 @@ async def create_user(db: AsyncSession, user: UserCreate):
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=400, detail="Username already exists")
+
 
 # Get user by username
 async def get_user_by_username(db: AsyncSession, username: str):

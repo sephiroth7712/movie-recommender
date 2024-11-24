@@ -8,6 +8,7 @@ import crud
 
 app = FastAPI()
 
+
 # Create tables
 @app.on_event("startup")
 async def startup():
@@ -17,17 +18,22 @@ async def startup():
     except Exception as e:
         print(f"Database connection error: {str(e)}")
         raise e
+
+
 # # Routes
+
 
 # Create an item
 @app.post("/users/", response_model=UserResponse)
 async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     return await crud.create_user(db, user)
 
+
 # Get all items
 @app.get("/items/", response_model=list[ItemResponse])
 async def read_items(db: AsyncSession = Depends(get_db)):
     return await crud.get_items(db)
+
 
 # Get a specific item
 @app.get("/items/{item_id}", response_model=ItemResponse)
@@ -37,13 +43,17 @@ async def read_item(item_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
+
 # Update an item
 @app.put("/items/{item_id}", response_model=ItemResponse)
-async def update_item(item_id: int, item: ItemCreate, db: AsyncSession = Depends(get_db)):
+async def update_item(
+    item_id: int, item: ItemCreate, db: AsyncSession = Depends(get_db)
+):
     updated_item = await crud.update_item(db, item_id, item)
     if not updated_item:
         raise HTTPException(status_code=404, detail="Item not found")
     return updated_item
+
 
 # Delete an item
 @app.delete("/items/{item_id}")
