@@ -9,6 +9,10 @@ config = dotenv_values(".env")
 
 DATABASE_URL = f"postgresql+asyncpg://{config["DATABASE_USER"]}:{quote_plus(config["DATABASE_PASSWORD"])}@{config["DATABASE_DOMAIN"]}/{config["DATABASE_NAME"]}"
 
+SECRET_KEY = config["SECRET_KEY"]
+ALGORITHM = config["ALGORITHM"]
+ACCESS_TOKEN_EXPIRE_MINUTES = config["ACCESS_TOKEN_EXPIRE_MINUTES"]
+
 # Create async engine
 engine = create_async_engine(DATABASE_URL, future=True, echo=True, poolclass=NullPool)
 
