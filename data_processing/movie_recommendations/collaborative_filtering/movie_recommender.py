@@ -1,127 +1,279 @@
 import pandas as pd
 import numpy as np
 from scipy.sparse import csr_matrix
-from sklearn.neighbors import NearestNeighbors
 import os
-from sklearn.preprocessing import StandardScaler
 
-class MovieRecommender:
-    def __init__(self, n_neighbors=5):
-        self.model = NearestNeighbors(metric='cosine', n_neighbors=n_neighbors, algorithm='brute')
-        self.sparse_matrix = None
+class UserBasedRecommender:
+    def __init__(self):
+        self.user_to_movie_ratings = {}
         self.movies_df = None
-        self.user_mapper = None
-        self.movie_mapper = None
-        self.movie_ids = None
+        self.valid_movie_ids = set()
         
-    def _create_mappings(self, ratings_df):
-        """Create user and movie ID mappings to compressed indices"""
-        unique_users = ratings_df['userId'].unique()
-        unique_movies = ratings_df['movieId'].unique()
-        
-        self.user_mapper = {old: new for new, old in enumerate(unique_users)}
-        self.movie_mapper = {old: new for new, old in enumerate(unique_movies)}
-        self.reverse_movie_mapper = {new: old for old, new in self.movie_mapper.items()}
-        
-    def fit(self, ratings_df, movies_df, min_ratings=10):
-        """
-        Fit the recommender system with improved memory efficiency
-        
-        Parameters:
-        - ratings_df: DataFrame with columns (userId, movieId, rating)
-        - movies_df: DataFrame with movie information
-        - min_ratings: Minimum number of ratings for a movie to be included
-        """
+    def fit(self, ratings_df, movies_df):
+        """Fit the recommender system with user ratings data"""
         print("Processing data...")
         
-        # Filter out movies with too few ratings
-        movie_counts = ratings_df['movieId'].value_counts()
-        valid_movies = movie_counts[movie_counts >= min_ratings].index
-        ratings_df = ratings_df[ratings_df['movieId'].isin(valid_movies)]
+        # Store valid movie IDs
+        self.valid_movie_ids = set(movies_df['movieId'].unique())
         
-        # Create compressed mappings
-        self._create_mappings(ratings_df)
+        # Create user-movie ratings dictionary
+        for _, row in ratings_df.iterrows():
+            user_id = row['userId']
+            if user_id not in self.user_to_movie_ratings:
+                self.user_to_movie_ratings[user_id] = {}
+            self.user_to_movie_ratings[user_id][row['movieId']] = row['rating']
         
-        # Convert IDs to compressed indices
-        rows = ratings_df['userId'].map(self.user_mapper)
-        cols = ratings_df['movieId'].map(self.movie_mapper)
-        
-        # Create sparse matrix
-        self.sparse_matrix = csr_matrix(
-            (ratings_df['rating'], (rows, cols)),
-            shape=(len(self.user_mapper), len(self.movie_mapper))
-        )
-        
-        # Store movie information
+        # Store movies dataframe
         self.movies_df = movies_df
-        self.movie_ids = list(self.movie_mapper.keys())
-        
-        # Fit the model
-        print(f"Fitting model with matrix shape: {self.sparse_matrix.shape}")
-        self.model.fit(self.sparse_matrix)
         print("Model fitted successfully!")
-        
-    def _create_user_vector(self, movie_ratings):
-        """Create a sparse user vector from movie ratings"""
-        vector = np.zeros(len(self.movie_mapper))
-        for movie_id, rating in movie_ratings.items():
-            if movie_id in self.movie_mapper:
-                vector[self.movie_mapper[movie_id]] = rating
-        return vector
     
-    def get_movie_recommendations(self, movie_ratings, n_recommendations=5):
-        """Generate recommendations based on movie ratings"""
+    def get_movie_details(self, movie_id):
+        """Safely get movie details"""
+        movie_data = self.movies_df[self.movies_df['movieId'] == movie_id]
+        if movie_data.empty:
+            return None
+        return movie_data.iloc[0]
+    
+    def find_similar_users(self, user_ratings, n_similar=10):
+        """Find users who rated similar movies similarly"""
+        user_similarities = []
+        
+        for user_id, ratings in self.user_to_movie_ratings.items():
+            similarity_score = 0
+            common_movies = 0
+            
+            # Compare ratings for common movies
+            for movie_id, rating in user_ratings.items():
+                if movie_id in ratings:
+                    # Calculate rating difference
+                    rating_diff = abs(rating - ratings[movie_id])
+                    # Similarity scoring based on rating difference
+                    if rating_diff == 0:
+                        similarity_score += 1.0
+                    elif rating_diff <= 0.5:
+                        similarity_score += 0.9
+                    elif rating_diff <= 1.0:
+                        similarity_score += 0.7
+                    elif rating_diff <= 1.5:
+                        similarity_score += 0.5
+                    elif rating_diff <= 2.0:
+                        similarity_score += 0.3
+                    common_movies += 1
+            
+            if common_movies > 0:
+                # Calculate final similarity score
+                avg_similarity = similarity_score / common_movies
+                # Bonus for more common movies
+                final_similarity = avg_similarity * (1 + min(common_movies/5, 1))
+                user_similarities.append((user_id, final_similarity))
+        
+        # Sort and return top similar users
+        user_similarities.sort(key=lambda x: x[1], reverse=True)
+        return user_similarities[:n_similar]
+    
+    def get_recommendations(self, user_ratings, n_recommendations=5):
+        """Generate recommendations with improved error handling"""
         try:
-            # Create user vector
-            user_vector = self._create_user_vector(movie_ratings)
+            similar_users = self.find_similar_users(user_ratings)
+            if not similar_users:
+                return []
             
-            # Find similar users
-            distances, indices = self.model.kneighbors([user_vector])
+            # Get genres of rated movies
+            user_genres = set()
+            for movie_id in user_ratings:
+                movie = self.get_movie_details(movie_id)
+                if movie is not None:
+                    user_genres.update(movie['genres'].split('|'))
             
-            # Get recommendations using sparse matrix operations
-            similar_users_matrix = self.sparse_matrix[indices[0]]
-            weights = 1 - distances[0]
-            weights = weights / weights.sum()  # Normalize weights
+            # Collect movie scores
+            movie_scores = {}
+            movie_counts = {}
+            movie_similarities = {}
             
-            # Calculate weighted average ratings
-            weighted_ratings = similar_users_matrix.T.dot(weights)
+            for user_id, similarity in similar_users:
+                user_ratings_dict = self.user_to_movie_ratings[user_id]
+                
+                for movie_id, rating in user_ratings_dict.items():
+                    # Skip if movie isn't in our valid set or already rated
+                    if movie_id not in self.valid_movie_ids or movie_id in user_ratings:
+                        continue
+                        
+                    if rating >= 3.5:  # Only consider above-average ratings
+                        if movie_id not in movie_scores:
+                            movie = self.get_movie_details(movie_id)
+                            if movie is None:
+                                continue
+                                
+                            movie_scores[movie_id] = 0
+                            movie_counts[movie_id] = 0
+                            
+                            # Calculate genre similarity
+                            movie_genres = set(movie['genres'].split('|'))
+                            genre_similarity = len(user_genres.intersection(movie_genres)) / len(user_genres.union(movie_genres)) if user_genres else 0
+                            movie_similarities[movie_id] = genre_similarity
+                        
+                        # Weight rating by both similarities
+                        weighted_rating = rating * similarity * (1 + movie_similarities[movie_id])
+                        movie_scores[movie_id] += weighted_rating
+                        movie_counts[movie_id] += 1
             
-            # Convert to series for easier processing
-            predicted_ratings = pd.Series(
-                weighted_ratings,
-                index=[self.reverse_movie_mapper[i] for i in range(len(weighted_ratings))]
-            )
+            # Calculate final scores
+            recommendations = []
+            for movie_id in movie_scores:
+                if movie_counts[movie_id] >= 2:  # Require at least 2 similar users
+                    avg_score = movie_scores[movie_id] / movie_counts[movie_id]
+                    confidence_factor = min(movie_counts[movie_id]/5, 1)
+                    final_score = avg_score * (1 + confidence_factor * 0.2)
+                    recommendations.append((movie_id, final_score))
             
-            # Filter out already rated movies
-            predicted_ratings = predicted_ratings[~predicted_ratings.index.isin(movie_ratings.keys())]
+            if not recommendations:
+                return []
             
-            # Get top recommendations
-            top_movies = predicted_ratings.nlargest(n_recommendations)
+            # Sort and prepare recommendations
+            recommendations.sort(key=lambda x: x[1], reverse=True)
             
-            # Prepare results
-            results = []
-            for movie_id, pred_rating in top_movies.items():
-                movie = self.movies_df[self.movies_df['movieId'] == movie_id].iloc[0]
-                results.append({
+            top_recommendations = []
+            for movie_id, score in recommendations[:n_recommendations]:
+                movie = self.get_movie_details(movie_id)
+                if movie is None:
+                    continue
+                    
+                scaled_score = min(5, max(1, score * 3.5))
+                top_recommendations.append({
                     'movieId': movie_id,
                     'title': movie['title'],
                     'genres': movie['genres'],
-                    'predicted_rating': round(float(pred_rating), 2),
+                    'predicted_rating': round(float(scaled_score), 2),
                     'year': movie.get('year'),
-                    'average_rating': round(float(movie['average_rating']), 2) if 'average_rating' in movie else None
+                    'average_rating': round(float(movie['average_rating']), 2) if 'average_rating' in movie else None,
+                    'num_similar_users': movie_counts[movie_id],
+                    'genre_similarity': round(movie_similarities[movie_id] * 100, 1)
                 })
             
-            return results
+            return top_recommendations
             
         except Exception as e:
-            print(f"Error in get_movie_recommendations: {str(e)}")
+            print(f"Error in get_recommendations: {str(e)}")
             import traceback
             print(traceback.format_exc())
             return []
-
+        
 def search_movies(movies_df, title_query):
     """Search for movies by title"""
     matches = movies_df[
         movies_df['title'].str.contains(title_query, case=False, na=False)
     ]
     return matches[['movieId', 'title', 'genres', 'year', 'average_rating']].head()
+
+def format_genres(genres_string):
+    """Format genres string for display"""
+    return genres_string.replace('|', ', ')
+
+def main():
+    print("=== Movie Recommender System ===\n")
+    
+    # Load data
+    print("Loading data...")
+    try:
+        base_path = r"C:\VCU\DataScience\Project\movie-recommender\data_processing\datasets\processed_data"
+        
+        ratings_path = os.path.join(base_path, "processed_ratings.csv")
+        movies_path = os.path.join(base_path, "merged_movies_dataset.csv")
+        
+        print(f"Loading ratings from: {ratings_path}")
+        print(f"Loading movies from: {movies_path}")
+        
+        ratings_df = pd.read_csv(ratings_path)
+        print(f"Total ratings loaded: {len(ratings_df)}")
+        
+        # Sample users who have rated at least 5 movies
+        user_counts = ratings_df['userId'].value_counts()
+        active_users = user_counts[user_counts >= 5].index
+        if len(active_users) > 10000:
+            active_users = np.random.choice(active_users, 10000, replace=False)
+        
+        ratings_df = ratings_df[ratings_df['userId'].isin(active_users)]
+        print(f"Using {len(ratings_df)} ratings from {len(active_users)} users")
+        
+        movies_df = pd.read_csv(movies_path, low_memory=False)
+        print(f"Movies loaded: {len(movies_df)}")
+        
+    except Exception as e:
+        print(f"Error loading data: {str(e)}")
+        return
+    
+    # Initialize and fit recommender
+    print("\nInitializing recommender...")
+    recommender = UserBasedRecommender()
+    recommender.fit(ratings_df, movies_df)
+    
+    # Interactive loop for movie ratings
+    user_ratings = {}
+    print("\nStart rating movies to get personalized recommendations!")
+    print("Rate movies on a scale of 1-5 (1=Terrible, 5=Excellent)")
+    
+    while True:
+        title = input("\nEnter a movie title to search (or 'done' to finish): ")
+        if title.lower() == 'done':
+            break
+            
+        matches = search_movies(movies_df, title)
+        if matches.empty:
+            print("No movies found with that title.")
+            continue
+            
+        print("\nFound these movies:")
+        for i, (_, movie) in enumerate(matches.iterrows(), 1):
+            print(f"\n{i}. {movie['title']} ({movie['year']})")
+            print(f"   Genres: {format_genres(movie['genres'])}")
+            if 'average_rating' in movie and not pd.isna(movie['average_rating']):
+                print(f"   Average Rating: {round(movie['average_rating'], 2)}/5.0")
+        
+        selection = input("\nEnter the number of the movie you want to rate (0 to skip): ")
+        if not selection.isdigit() or int(selection) == 0:
+            continue
+            
+        selection = int(selection) - 1
+        if selection < 0 or selection >= len(matches):
+            print("Invalid selection")
+            continue
+            
+        rating = input("Enter your rating (1-5): ")
+        if not rating.replace('.', '').isdigit():
+            print("Invalid rating")
+            continue
+            
+        rating = float(rating)
+        if rating < 1 or rating > 5:
+            print("Rating must be between 1 and 5")
+            continue
+            
+        movie_id = matches.iloc[selection]['movieId']
+        user_ratings[movie_id] = rating
+        
+        # Show current ratings
+        print("\nYour current ratings:")
+        for rated_movie_id, user_rating in user_ratings.items():
+            movie = movies_df[movies_df['movieId'] == rated_movie_id].iloc[0]
+            print(f"- {movie['title']}: {user_rating}/5.0")
+        
+        # Get and show recommendations
+        print(f"\nBased on users with similar taste, you might enjoy:")
+        recommendations = recommender.get_recommendations(user_ratings)
+        
+        if recommendations:
+            for i, movie in enumerate(recommendations, 1):
+                print(f"\n{i}. {movie['title']} ({movie['year']})")
+                print(f"   Genres: {format_genres(movie['genres'])}")
+                print(f"   Predicted Rating: {movie['predicted_rating']}/5.0")
+                print(f"   Average Rating: {movie['average_rating']}/5.0")
+                print(f"   Genre Similarity: {movie['genre_similarity']}%")
+                print(f"   Recommended by {movie['num_similar_users']} similar users")
+        else:
+            print("\nNeed more ratings to make recommendations. Please rate more movies.")
+    
+    print("\n=== Recommendation Complete ===")
+
+if __name__ == "__main__":
+    main()
+    input("\nPress Enter to exit...")
