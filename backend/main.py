@@ -1,10 +1,13 @@
+from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import timedelta, datetime
 from database import get_db, config
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemas import UserResponse
+from database import get_db, engine
+from models import Base
+from schemas import UserCreate, UserResponse
 import crud
 from crud import verify_password, get_user_by_username
 from schemas import (
@@ -19,8 +22,10 @@ from database import engine
 from models import Base
 from datetime import datetime, timedelta, timezone
 from fastapi import Query
+from content_based_recommendation_service import ContentBasedRecommendationService
 
 app = FastAPI()
+cbf_recommender_service = ContentBasedRecommendationService()
 
 
 def create_access_token(data: dict, expires_delta: timedelta):
@@ -40,6 +45,7 @@ async def startup():
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        await cbf_recommender_service.setup()
     except Exception as e:
         print(f"Database connection error: {str(e)}")
         raise e
@@ -117,12 +123,11 @@ async def read_movie(movie_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Movie not found")
     return movie
 
-#Movie Search
+
+# Movie Search
 @app.get("/movies/search/", response_model=list[MovieResponse])
 async def search_movies(
-    name: str = Query(
-        ..., description="Search movie"
-    ),
+    name: str = Query(..., description="Search movie"),
     db: AsyncSession = Depends(get_db),
 ):
     movies = await crud.search_movie_by_name(db, name)
@@ -131,6 +136,42 @@ async def search_movies(
             status_code=404, detail="No movies found with the given name"
         )
     return movies
+
+
+# Recommendation routes
+@app.get("/movies/{movie_id}/recommendations")
+async def get_movie_recommendations(
+    movie_id: int,
+    n_recommendations: int = 4,
+    min_year: Optional[int] = None,
+    max_year: Optional[int] = None,
+    genres: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    genre_list = genres.split(",") if genres else None
+    recommendations = await cbf_recommender_service.get_recommendations(
+        db, movie_id, n_recommendations, min_year, max_year, genre_list
+    )
+    return {"recommendations": recommendations}
+
+
+@app.get("/users/{user_id}/recommendations")
+async def get_user_recommendations(
+    user_id: int,
+    n_recommendations: int = 4,
+    min_rating: Optional[float] = 3.5,
+    min_year: Optional[int] = None,
+    max_year: Optional[int] = None,
+    genres: Optional[str] = None,
+    type: Optional[str] = "cbf",
+    db: AsyncSession = Depends(get_db),
+):
+    genre_list = genres.split(",") if genres else None
+    if type == "cbf":
+        recommendations = await cbf_recommender_service.get_user_recommendations(
+            db, user_id, n_recommendations, min_rating, min_year, max_year, genre_list
+        )
+    return {"recommendations": recommendations}
 
 
 # Rating Routes

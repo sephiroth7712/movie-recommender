@@ -1,7 +1,6 @@
 import pandas as pd
 import ast
 from collections import Counter
-import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple
 from config import *
 
@@ -54,33 +53,6 @@ def print_genre_stats(stats_df: pd.DataFrame) -> None:
     print("-" * 50)
     print(stats_df.tail().to_string())
 
-
-def plot_genre_distribution(stats_df: pd.DataFrame, n_genres: int = 10) -> None:
-    """
-    Plot genre distribution
-
-    Args:
-        stats_df (pd.DataFrame): DataFrame with genre statistics
-        n_genres (int): Number of genres to plot from each end
-    """
-    plt.figure(figsize=(15, 8))
-
-    # Plot least common genres
-    plt.subplot(1, 2, 1)
-    stats_df.head(n_genres).plot(kind="barh", y="count")
-    plt.title(f"{n_genres} Least Common Genres")
-    plt.xlabel("Number of Movies")
-
-    # Plot most common genres
-    plt.subplot(1, 2, 2)
-    stats_df.tail(n_genres).plot(kind="barh", y="count")
-    plt.title(f"{n_genres} Most Common Genres")
-    plt.xlabel("Number of Movies")
-
-    plt.tight_layout()
-    plt.show()
-
-
 def get_genre_distribution():
     file_path = (
         DATASETS_PROCESSED
@@ -102,8 +74,6 @@ def get_genre_distribution():
         print("=" * 50)
         print(low_count_genres.to_string())
 
-        # Plot distribution
-        plot_genre_distribution(stats_df)
 
         # Save statistics to CSV
         output_file = DATASETS_PROCESSED + "/genre_distribution.csv"
@@ -173,6 +143,16 @@ def merge_movie_genres():
     print("\nAll unique genres found:")
     for genre in unique_genres:
         print(f"{genre}")
+
+    processed_df = processed_df.astype(
+        {
+            "year": "Int64",  # This is pandas nullable integer type, allows for None/NA values
+            "number_of_ratings": "Int64",
+            "tmdbId": "Int64",
+            "tconst": "Int64",
+            "imdb_votes": "Int64",
+        }
+    )
 
     # Save the updated DataFrame
     processed_df.to_csv(

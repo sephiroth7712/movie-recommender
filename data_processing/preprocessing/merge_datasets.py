@@ -23,7 +23,7 @@ def load_metadata(metadata_path):
 
     def extract_year(date_str):
         if pd.isna(date_str):
-            return None
+            return 0
         try:
             # First try to parse as a full date
             if isinstance(date_str, str) and "-" in date_str:
@@ -31,7 +31,7 @@ def load_metadata(metadata_path):
             # If it's already a year (could be float or int)
             return int(float(date_str))
         except (ValueError, TypeError):
-            return None
+            return 0
 
     # Apply the year extraction to the year column
     metadata_df["year"] = metadata_df["year"].apply(extract_year)
@@ -62,11 +62,21 @@ def merge_datasets(aligned_path, processed_path, metadata_path):
     aligned_df = pd.read_csv(aligned_path)
     processed_df = pd.read_csv(processed_path)
 
+    processed_df = processed_df.astype(
+        {
+            "year": "Int64",  # This is pandas nullable integer type, allows for None/NA values
+            "number_of_ratings": "Int64",
+            "tmdbId": "Int64",
+            "tconst": "Int64",
+            "imdb_votes": "Int64",
+        }
+    )
+
     # Load years from metadata
     wiki_years, wiki_runtimes = load_metadata(metadata_path)
 
     # Create mapping dictionaries for faster lookups
-    processed_titles = set(processed_df["primaryTitle"].str.lower())
+    processed_titles = set(processed_df["primaryTitle"].str.strip().str.lower() + processed_df["year"].astype(str))
 
     # Initialize list to store new entries
     new_entries = []
@@ -77,7 +87,9 @@ def merge_datasets(aligned_path, processed_path, metadata_path):
 
     # Process aligned data entries
     for _, row in aligned_df.iterrows():
-        movie_name = row["movie_name"].lower()
+        movie_name = row["movie_name"].lower() + str(int(wiki_years.get(row["wikipedia_movie_id"], None)))
+        if(row["movie_name"]) == "Sabrina":
+            print(movie_name)
 
         if movie_name not in processed_titles:
             # Create new entry
@@ -126,6 +138,10 @@ def merge_datasets(aligned_path, processed_path, metadata_path):
     else:
         final_df = merged_df
 
+    final_df["title_year"] = final_df["primaryTitle"].str.strip().str.lower() + final_df["year"].astype(str)
+    final_df = final_df.drop_duplicates(subset=["title_year"])
+    final_df = final_df.drop("title_year", axis=1)
+
     final_df = final_df.astype(
         {
             "year": "Int64",  # This is pandas nullable integer type, allows for None/NA values
@@ -159,7 +175,7 @@ if __name__ == "__main__":
     # Define file paths
     aligned_path = DATASETS_PROCESSED + "/aligned_genre_data.csv"
     processed_path = DATASETS_PROCESSED + "/processed_movies_cleaned.csv"
-    metadata_path = DATASETS_PROCESSED + "/cmu_summaries/movie.metadata.tsv"
+    metadata_path = DATASETS_RAW + "/cmu_summaries/movie.metadata.tsv"
     output_path = DATASETS_PROCESSED + "/merged_movies_dataset.csv"
 
     # Process and merge datasets

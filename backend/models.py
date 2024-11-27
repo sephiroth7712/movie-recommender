@@ -1,13 +1,4 @@
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    Float,
-    Text,
-    ForeignKey,
-    TIMESTAMP,
-    UniqueConstraint,
-)
+from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, TIMESTAMP, UniqueConstraint, Index, Boolean
 from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -21,24 +12,25 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False)  # Email as username
     password = Column(String, nullable=False)  # Hashed password
+    is_dataset_user = Column(Boolean, nullable=False)
 
 
-# Movie Model
 class Movie(Base):
     __tablename__ = "movies"
 
-    movie_id = Column(
-        Integer, primary_key=True, index=True, autoincrement=True
-    )  # SERIAL in PostgreSQL
-    title = Column(String(255), nullable=False)  # VARCHAR(255)
-    plot_summary = Column(Text, nullable=True)  # TEXT
-    release_year = Column(Integer, nullable=True)  # INTEGER
-    runtime = Column(Integer, nullable=True)  # INTEGER
-    language = Column(String(50), nullable=True)  # VARCHAR(50)
-    genres = Column(ARRAY(String), nullable=True)  # TEXT[]
-    plot_vector = Column(TSVECTOR, nullable=True)  # tsvector
-    feature_vector = Column(ARRAY(Float), nullable=True)  # float[]
+    movie_id = Column(Integer, primary_key=True, index=True)
+    title = Column(Text, nullable=False)
+    plot_summary = Column(Text, nullable=True)
+    release_year = Column(String, nullable=True)
+    runtime = Column(Float, nullable=True)
+    genres = Column(ARRAY(String), nullable=True)
+    imdb_id = Column(String, nullable=True)
+    tmdb_id = Column(String, nullable=True)
 
+    __table_args__ = (
+        Index('idx_movie_title', title),
+        Index('idx_movie_year', release_year),
+    )
 
 # Rating Model
 class Rating(Base):
@@ -57,7 +49,7 @@ class Rating(Base):
     timestamp = Column(
         TIMESTAMP, nullable=True
     )  # TIMESTAMP for when the rating was given
-
+    is_dataset_rating = Column(Boolean, nullable=False)
     # Unique constraint to ensure a user can rate a movie only once
     __table_args__ = (
         UniqueConstraint("user_id", "movie_id", name="unique_user_movie"),
