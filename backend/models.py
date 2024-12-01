@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, TIMESTAMP, UniqueConstraint, Index, Boolean
+from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, UniqueConstraint, Index, Boolean
 from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -13,6 +13,7 @@ class User(Base):
     username = Column(String, unique=True, nullable=False)  # Email as username
     password = Column(String, nullable=False)  # Hashed password
     is_dataset_user = Column(Boolean, nullable=False)
+    movies_watched = Column(ARRAY(Integer), nullable=False)
 
 
 class Movie(Base):
@@ -46,10 +47,7 @@ class Rating(Base):
         Integer, ForeignKey("movies.movie_id"), nullable=False
     )  # Foreign key to movies(movie_id)
     rating = Column(Float, nullable=False)  # FLOAT for user ratings
-    timestamp = Column(
-        TIMESTAMP, nullable=True
-    )  # TIMESTAMP for when the rating was given
-    is_dataset_rating = Column(Boolean, nullable=False)
+    is_dataset_rating = Column(Boolean, nullable=False, default=False)
     # Unique constraint to ensure a user can rate a movie only once
     __table_args__ = (
         UniqueConstraint("user_id", "movie_id", name="unique_user_movie"),

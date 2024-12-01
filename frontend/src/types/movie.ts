@@ -1,8 +1,7 @@
 export interface Movie {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  plot: string;
-  rating: number;
-  numberOfReviews: number;
+  movie_id: string;
+  title: string;
+  plot_summary: string;
+  genres: string[];
+  release_year: number;
 }

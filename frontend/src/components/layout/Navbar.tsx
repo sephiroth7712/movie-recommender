@@ -9,6 +9,7 @@ import {
 } from "@headlessui/react";
 import { useAuth } from "../../hooks/useAuth";
 import { navigation } from "../../config/navigation";
+import { FaUser } from "react-icons/fa";
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
@@ -18,44 +19,6 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   return (
-    // <nav className="bg-white shadow-lg">
-    //   <div className="max-w-7xl mx-auto px-4">
-    //     <div className="flex justify-between h-16">
-    //       <div className="flex">
-    //         <Link to="/" className="flex items-center">
-    //           <span className="text-xl font-bold">MovieRecommender</span>
-    //         </Link>
-    //       </div>
-
-    //       <div className="flex items-center">
-    //         {user ? (
-    //           <div className="flex items-center space-x-4">
-    //             <Link to="/watchlist" className="text-gray-700">
-    //               Watchlist
-    //             </Link>
-    //             <Link to="/profile" className="text-gray-700">
-    //               Profile
-    //             </Link>
-    //             <button
-    //               onClick={logout}
-    //               className="bg-red-500 text-white px-4 py-2 rounded-md"
-    //             >
-    //               Logout
-    //             </button>
-    //           </div>
-    //         ) : (
-    //           <Link
-    //             to="/login"
-    //             className="bg-blue-500 text-white px-4 py-2 rounded-md"
-    //           >
-    //             Login
-    //           </Link>
-    //         )}
-    //       </div>
-    //     </div>
-    //   </div>
-    // </nav>
-
     <Disclosure as="nav" className="bg-gray-800">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
@@ -95,11 +58,12 @@ export default function Navbar() {
                     <MenuButton className="relative flex max-w-xs items-center rounded-full bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800">
                       <span className="absolute -inset-1.5" />
                       <span className="sr-only">Open user menu</span>
-                      <img
+                      {/* <img
                         alt=""
                         src={user.imageUrl}
                         className="size-8 rounded-full"
-                      />
+                      /> */}
+                      <FaUser className="size-8 rounded-full" />
                     </MenuButton>
                   </div>
                   <MenuItems

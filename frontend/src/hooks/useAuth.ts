@@ -3,24 +3,24 @@ import { useNavigate } from "react-router-dom";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authService } from "../services/auth.service";
+import { userService } from "../services/user.service";
 
-interface User {
+export interface User {
   id: string;
-  email: string;
-  name: string;
-  imageUrl?: string;
+  username: string;
+  movies_watched: number[];
 }
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isLoading: boolean;
   isInitialized: boolean;
   login: (
-    email: string,
+    username: string,
     password: string,
     rememberMe?: boolean
   ) => Promise<void>;
+  register: (username: string, password: string) => Promise<void>;
   logout: () => void;
   initialize: () => Promise<void>;
 }
@@ -29,51 +29,52 @@ export const useAuth = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
-      token: null,
       isLoading: true,
       isInitialized: false,
       initialize: async () => {
         try {
           set({ isLoading: true });
-          // Check if token is valid
-          const token = get().token;
-          if (token) {
-            const user = await authService.validateToken();
-            set({ user, isInitialized: true });
+          let user = get().user;
+          if (user) {
+            user = await userService.getUser(user.id);
+            set({ user });
           }
         } catch (error) {
-          // If token validation fails, clear the auth state
-          set({ user: null, token: null });
+          set({ user: null });
         } finally {
           set({ isLoading: false, isInitialized: true });
         }
       },
-      login: async (email: string, password: string, rememberMe?: boolean) => {
+      login: async (
+        username: string,
+        password: string,
+        rememberMe?: boolean
+      ) => {
         try {
-          //   // TODO: Replace with your actual API call
-          //   const response = await fetch('/api/auth/login', {
-          //     method: 'POST',
-          //     headers: {
-          //       'Content-Type': 'application/json',
-          //     },
-          //     body: JSON.stringify({ email, password }),
-          //   });
+          const loginData = {
+            username,
+            password,
+          };
+          const response = await authService.login(loginData);
 
-          //   if (!response.ok) {
-          //     throw new Error('Invalid credentials');
-          //   }
+          if (!response) {
+            throw new Error("Invalid credentials");
+          }
 
-          //   const data = await response.json();
-          //   set({ user: data.user, token: data.token });
-          set({
-            user: {
-              id: "sephiroth7712",
-              email: "roshanjames7@gmail.com",
-              name: "Roshan",
-              imageUrl:"https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-            },
-            token: "abcd1234",
-          });
+          set({ user: response });
+        } catch (error) {
+          throw error;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+      register: async (username: string, password: string) => {
+        try {
+          const loginData = {
+            username,
+            password,
+          };
+          await authService.register(loginData);
         } catch (error) {
           throw error;
         } finally {
@@ -84,7 +85,7 @@ export const useAuth = create<AuthState>()(
         try {
           set({ isLoading: true });
           await authService.logout();
-          set({ user: null, token: null });
+          set({ user: null });
         } finally {
           set({ isLoading: false });
         }
@@ -94,7 +95,6 @@ export const useAuth = create<AuthState>()(
       name: "auth-storage", // name of the item in localStorage
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
       }),
     }
   )

@@ -1,5 +1,5 @@
 from collections import defaultdict
-import numpy as np
+import spacy
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -7,6 +7,9 @@ from typing import List, Dict, Tuple
 import re
 from sqlalchemy import Row, Sequence
 from backend.models import Movie, Rating
+from concurrent.futures import ProcessPoolExecutor
+import spacy
+from typing import List
 
 
 class ContentBasedRecommender:
@@ -19,9 +22,14 @@ class ContentBasedRecommender:
         """
         # Clean the DataFrame first
         self.movies_df = self._clean_dataframe(movies_df)
+        self.nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
 
         self.tfidf = TfidfVectorizer(
-            max_features=5000, stop_words="english", ngram_range=(1, 2)
+            max_features=5000,
+            stop_words="english",
+            ngram_range=(1, 2),
+            max_df=0.85,
+            min_df=2,
         )
         self.content_matrix = None
 
@@ -45,53 +53,92 @@ class ContentBasedRecommender:
 
         return df
 
-    def _preprocess_text(self, text: str) -> str:
+    def _preprocess_batch(self, texts: List[str]) -> List[str]:
         """
-        Basic text preprocessing
+        Process a batch of texts using SpaCy's pipe
         """
-        if pd.isna(text):
-            return ""
+        processed = []
+        for doc in self.nlp.pipe(texts, batch_size=100):
+            tokens = []
+            for token in doc:
+                if token.pos_ not in ["PROPN", "PRON"]:
+                    tokens.append(token.lemma_)
+            processed.append(" ".join(tokens))
+        return processed
 
-        text = str(text).lower()
-        text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
+    def _parallel_batch_process(
+        self, content_strings: pd.Series, n_jobs: int = None, batch_size: int = 1000
+    ) -> List[str]:
+        """
+        Process text using both batching and parallel processing
+        """
+        # Convert series to list and clean the texts first
+        texts = [
+            re.sub(
+                r"\s+", " ", re.sub(r"[^a-zA-Z0-9\s]", " ", str(text).lower())
+            ).strip()
+            for text in content_strings
+        ]
 
-        return text
+        # Split into batches
+        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
 
-    def _create_content_string(self, row: pd.Series) -> str:
+        # Process batches in parallel
+        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+            results = list(executor.map(self._preprocess_batch, batches))
+
+        # Flatten results
+        return [item for sublist in results for item in sublist]
+
+    def _create_content_string(self, row: pd.Series, processed_plot: str) -> str:
         """
         Create a combined content string from movie features with revised weights.
-        Plot summary has increased weight, and genres are integrated into main recommendations.
+        Now accepts pre-processed plot summary.
         """
         # Process genres
-        # genres = str(row['genres']).replace('|', ' ')
         genres = " ".join(row["genres"])
-
-        # Process plot summary (increased weight)
-        plot = str(row["plot_summary"])
 
         # Process year
         year = str(int(row["release_year"])) if pd.notna(row["release_year"]) else ""
+        decade = f"decade_{int(int(year)/10)*10}s" if year else ""
 
         # Combine features with adjusted weights:
         # - Plot summary: 5x weight
         # - Genres: 2x weight
         # - Year: 1x weight
-        content_parts = [
-            genres * 2,  # Genre weight
-            plot * 5,  # Increased plot weight
-            year,  # Year weight
-        ]
+        content_parts = []
 
-        return " ".join(content_parts)
+        # Add genres (2x weight)
+        content_parts.extend([genres] * 2)
+
+        # Add processed plot (5x weight)
+        content_parts.extend([processed_plot] * 5)
+
+        # Add decade (1x weight)
+        content_parts.append(decade)
+
+        return " ".join(filter(None, content_parts))
 
     def _prepare_content_features(self):
         """
         Prepare the content features matrix
         """
-        content_strings = self.movies_df.apply(self._create_content_string, axis=1)
-        processed_contents = content_strings.apply(self._preprocess_text)
-        self.content_matrix = self.tfidf.fit_transform(processed_contents)
+        print("Preprocessing plot summaries")
+        # First process just the plot summaries
+        processed_plots = self._parallel_batch_process(
+            self.movies_df["plot_summary"], n_jobs=8, batch_size=1000
+        )
+        print("Creating content strings")
+        # Create a dictionary to map processed plots to their indices
+        processed_plots_dict = dict(enumerate(processed_plots))
+
+        # Create content strings using processed plots
+        content_strings = [
+            self._create_content_string(self.movies_df.iloc[i], processed_plots_dict[i])
+            for i in range(len(self.movies_df))
+        ]
+        print("Creating tfidf vectors")
+        self.content_matrix = self.tfidf.fit_transform(content_strings)
 
     def _get_similar_movies(
         self,
@@ -155,7 +202,7 @@ class ContentBasedRecommender:
         max_year: int = None,
         genres: List[str] = None,
         exclude_movie_ids: List[int] = None,
-    ) -> List[Dict[str, any]]:
+    ) -> List[Tuple]:
         """
         Get movie recommendations based on a given movie ID
         """
@@ -185,20 +232,21 @@ class ContentBasedRecommender:
                 n_recommendations, "similarity"
             )
 
-            # Format results
-            recommendations = []
-            for _, row in recommendations_df.iterrows():
-                recommendations.append(
-                    {
-                        "movie_id": row["movie_id"],
-                        "title": row["title"],
-                        "release_year": int(row["release_year"]),
-                        "genres": row["genres"],
-                        "similarity_score": float(row["similarity"]),
-                    }
-                )
+            all_recommendations = defaultdict(float)
 
-            return recommendations
+            # Format results
+            for _, row in recommendations_df.iterrows():
+                all_recommendations[row["movie_id"]] = float(row["similarity"])
+
+            recommended_movie_ids = sorted(
+                all_recommendations.items(),
+                key=lambda x: all_recommendations[x],
+                reverse=True,
+            )[:n_recommendations]
+
+            if not recommended_movie_ids:
+                return []
+            return recommended_movie_ids
 
         except Exception as e:
             print(f"Error getting recommendations: {str(e)}")
@@ -237,9 +285,7 @@ class ContentBasedRecommender:
 
             # Aggregate recommendations with rating weight
             for rec in movie_recs:
-                all_recommendations[rec["movie_id"]] += (
-                    rec["similarity_score"] * rating_weight
-                )
+                all_recommendations[rec[0]] += rec[1] * rating_weight
 
         # Get full details for recommended movies
         recommended_movie_ids = sorted(

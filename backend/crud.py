@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import and_, update
 from sqlalchemy.exc import IntegrityError
 from models import User, Movie, Rating
 from schemas import UserCreate, MovieCreate, RatingCreate
@@ -23,7 +24,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # Create a new user
 async def create_user(db: AsyncSession, user: UserCreate):
     hashed_password = hash_password(user.password)
-    new_user = User(username=user.username, password=hashed_password)
+    new_user = User(
+        username=user.username,
+        password=hashed_password,
+        is_dataset_user=False,
+        movies_watched=[],
+    )
     db.add(new_user)
     try:
         await db.commit()
@@ -32,6 +38,12 @@ async def create_user(db: AsyncSession, user: UserCreate):
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=400, detail="Username already exists")
+
+
+# Get user
+async def get_user(db: AsyncSession, user_id: int):
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalars().first()
 
 
 # Get user by username
@@ -64,7 +76,9 @@ async def get_movie(db: AsyncSession, movie_id: int):
 # Search a movie
 async def search_movie_by_name(db: AsyncSession, name: str):
     # Use `ILIKE` for case-insensitive search in PostgreSQL
-    result = await db.execute(select(Movie).where(Movie.title.ilike(f"%{name}%")))
+    result = await db.execute(
+        select(Movie).where(Movie.title.ilike(f"%{name}%")).limit(10)
+    )
     return result.scalars().all()
 
 
@@ -74,12 +88,29 @@ async def create_rating(db: AsyncSession, rating: RatingCreate):
     db.add(new_rating)
     await db.commit()
     await db.refresh(new_rating)
+
+    # add the rating to users watched list
+    user = await get_user(db, rating.user_id)
+    movies_watched = [movie_id for movie_id in user.movies_watched]
+    movies_watched.append(rating.movie_id)
+    update_query = (
+        update(User)
+        .where(User.id == rating.user_id)
+        .values(movies_watched=movies_watched)
+        .returning(User)
+    )
+    result = await db.execute(update_query)
+    await db.commit()
     return new_rating
 
 
 # Get all ratings
-async def get_ratings(db: AsyncSession):
-    result = await db.execute(select(Rating))
+async def get_ratings(user_id: int, movie_id: int, db: AsyncSession):
+    result = await db.execute(
+        select(Rating)
+        .where(and_(Rating.movie_id == movie_id, Rating.user_id == user_id))
+        .limit(1)
+    )
     return result.scalars().all()
 
 

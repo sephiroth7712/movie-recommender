@@ -80,7 +80,6 @@ async def load_ratings(session: AsyncSession, ratings_df: pd.DataFrame, movie_se
                     user_id=(row["userId"]),
                     movie_id=int(row["movieId"]),
                     rating=float(row["rating"]),
-                    timestamp=datetime.fromtimestamp(row["timestamp"]),
                     is_dataset_rating=True,
                 )
                 session.add(rating)

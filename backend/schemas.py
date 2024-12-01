@@ -1,6 +1,5 @@
 from pydantic import BaseModel, EmailStr
 from typing import List
-from datetime import datetime
 
 
 # User Schemas
@@ -12,6 +11,7 @@ class UserCreate(BaseModel):
 class UserResponse(BaseModel):
     id: int
     username: EmailStr
+    movies_watched: List[int] = []
 
     class Config:
         orm_mode = True
@@ -51,7 +51,17 @@ class RatingCreate(RatingBase):
 
 class RatingResponse(RatingBase):
     rating_id: int
-    timestamp: datetime = None
 
     class Config:
         orm_mode = True
+
+
+class GenreClassificationRequest(BaseModel):
+    plot_summary: str
+
+class GenrePrediction(BaseModel):
+    genre: str
+    confidence: float
+
+class GenreClassificationResponse(GenreClassificationRequest):
+    predictions: List[GenrePrediction]

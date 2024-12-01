@@ -1,6 +1,7 @@
 from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
+from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from datetime import timedelta, datetime
 from database import get_db, config
@@ -17,15 +18,24 @@ from schemas import (
     MovieResponse,
     RatingResponse,
     RatingCreate,
+    GenreClassificationRequest,
+    GenreClassificationResponse,
 )
 from database import engine
 from models import Base
 from datetime import datetime, timedelta, timezone
-from fastapi import Query
 from content_based_recommendation_service import ContentBasedRecommendationService
+from collaborative_recommendation_service import CollaborativeRecommendationService
+from genre_prediction_service import GenrePredictionService
+
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+)
 cbf_recommender_service = ContentBasedRecommendationService()
+cobf_recommender_service = CollaborativeRecommendationService()
+genre_prediction_service = GenrePredictionService()
 
 
 def create_access_token(data: dict, expires_delta: timedelta):
@@ -45,6 +55,9 @@ async def startup():
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+        print("Preparing collaborative recommender")
+        await cobf_recommender_service.setup()
+        print("Preparing content-based recommender")
         await cbf_recommender_service.setup()
     except Exception as e:
         print(f"Database connection error: {str(e)}")
@@ -57,11 +70,14 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     return await crud.create_user(db, user)
 
 
+@app.get("/users/{userid}", response_model=UserResponse)
+async def create_user(user_id: int, db: AsyncSession = Depends(get_db)):
+    return await crud.get_user(db, user_id)
+
+
 # User Login
-@app.post("/login/")
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
-):
+@app.post("/login/", response_model=UserResponse)
+async def login(form_data: UserCreate, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_username(db, form_data.username)
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
@@ -70,12 +86,7 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token_expires = timedelta(minutes=int(config["ACCESS_TOKEN_EXPIRE_MINUTES"]))
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
+    return user
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -125,7 +136,7 @@ async def read_movie(movie_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # Movie Search
-@app.get("/movies/search/", response_model=list[MovieResponse])
+@app.get("/search/movies", response_model=list[MovieResponse])
 async def search_movies(
     name: str = Query(..., description="Search movie"),
     db: AsyncSession = Depends(get_db),
@@ -135,7 +146,13 @@ async def search_movies(
         raise HTTPException(
             status_code=404, detail="No movies found with the given name"
         )
-    return movies
+    return [
+        {
+            "movie_id": movie.movie_id,
+            "title": movie.title,
+        }
+        for movie in movies
+    ]
 
 
 # Recommendation routes
@@ -171,18 +188,31 @@ async def get_user_recommendations(
         recommendations = await cbf_recommender_service.get_user_recommendations(
             db, user_id, n_recommendations, min_rating, min_year, max_year, genre_list
         )
+    elif type == "cobf":
+        recommendations = await cobf_recommender_service.get_recommendations_for_user(
+            db, user_id, n_recommendations
+        )
     return {"recommendations": recommendations}
 
 
 # Rating Routes
 @app.post("/ratings/", response_model=RatingResponse)
-async def create_rating(rating: RatingCreate, db: AsyncSession = Depends(get_db)):
-    return await crud.create_rating(db, rating)
+async def create_rating(
+    rating: RatingCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        response = await crud.create_rating(db, rating)
+        await cobf_recommender_service.update_user_rating()
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/ratings/", response_model=list[RatingResponse])
-async def read_ratings(db: AsyncSession = Depends(get_db)):
-    return await crud.get_ratings(db)
+async def read_ratings(user_id: int, movie_id: int, db: AsyncSession = Depends(get_db)):
+    return await crud.get_ratings(user_id, movie_id, db)
 
 
 @app.get("/ratings/{rating_id}", response_model=RatingResponse)
@@ -191,3 +221,20 @@ async def read_rating(rating_id: int, db: AsyncSession = Depends(get_db)):
     if not rating:
         raise HTTPException(status_code=404, detail="Rating not found")
     return rating
+
+
+# Genre Classification routes
+@app.post("/classify", response_model=GenreClassificationResponse)
+async def classify_genre(request: GenreClassificationRequest):
+    predicted_genres = genre_prediction_service.predict_genres(request.plot_summary)
+    response = dict()
+    response["plot_summary"] = request.plot_summary
+    response["predictions"] = []
+    print(predicted_genres)
+    for genre in predicted_genres.keys():
+        prediction = dict()
+        prediction["genre"] = genre
+        prediction["confidence"] = predicted_genres[genre]
+        response["predictions"].append(prediction)
+
+    return response

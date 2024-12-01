@@ -1,3 +1,4 @@
+from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -11,11 +12,12 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
+import spacy
 import re
 import pickle
 from typing import List, Tuple, Dict
 from sklearn.calibration import CalibratedClassifierCV
-from config import *
+from .config import *
 
 
 class EnhancedMovieGenreClassifier:
@@ -45,25 +47,59 @@ class EnhancedMovieGenreClassifier:
 
         self.lemmatizer = WordNetLemmatizer()
         self.thresholds = None
-
-        # Define genre relationships
-        self.genre_relationships = {
-            "romance film": ["romance"],
-            "comedy film": ["comedy"],
-            "romantic drama": ["romance", "drama"],
-            "psychological thriller": ["thriller"],
-            "film-noir": ["drama", "crime"],
-            "biographical": ["drama"],
-            "family film": ["children"],
-            "science fiction": ["fantasy"],
-            "bollywood": ["world cinema"],
-            "japanese movies": ["world cinema"],
-        }
+        self.nlp = spacy.load("en_core_web_sm", disable=["parser", "ner"])
 
         # Download required NLTK data
         nltk.download("punkt")
         nltk.download("stopwords")
         nltk.download("wordnet")
+
+    def _preprocess_batch(self, texts: List[str]) -> List[str]:
+        """
+        Process a batch of texts using SpaCy's pipe
+        """
+        processed = []
+        for doc in self.nlp.pipe(texts, batch_size=100):
+            tokens = []
+            for token in doc:
+                if token.pos_ not in ["PROPN", "PRON"]:
+                    tokens.append(token.lemma_)
+            text = " ".join(tokens)
+
+            # Tokenize and lemmatize
+            tokens = word_tokenize(text)
+            tokens = [self.lemmatizer.lemmatize(token) for token in tokens]
+
+            # Remove stopwords
+            stop_words = set(stopwords.words("english"))
+            tokens = [token for token in tokens if token not in stop_words]
+
+            processed.append(" ".join(tokens))
+        return processed
+
+    def _parallel_batch_process(
+        self, content_strings: pd.Series, n_jobs: int = None, batch_size: int = 1000
+    ) -> List[str]:
+        """
+        Process text using both batching and parallel processing
+        """
+        # Convert series to list and clean the texts first
+        texts = [
+            re.sub(
+                r"\s+", " ", re.sub(r"[^a-zA-Z0-9\s]", " ", str(text).lower())
+            ).strip()
+            for text in content_strings
+        ]
+
+        # Split into batches
+        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
+
+        # Process batches in parallel
+        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
+            results = list(executor.map(self._preprocess_batch, batches))
+
+        # Flatten results
+        return [item for sublist in results for item in sublist]
 
     def preprocess_text(self, text: str) -> str:
         """
@@ -72,6 +108,15 @@ class EnhancedMovieGenreClassifier:
         # Convert to lowercase and remove special characters
         text = text.lower()
         text = re.sub(r"[^a-zA-Z\s]", "", text)
+        
+        tokens = []
+        doc = self.nlp(text)
+
+        for token in doc:
+            if token.pos_ not in ["PROPN", "PRON"]:
+                tokens.append(token.lemma_)
+        
+        text = " ".join(tokens)
 
         # Tokenize and lemmatize
         tokens = word_tokenize(text)
@@ -82,6 +127,8 @@ class EnhancedMovieGenreClassifier:
         tokens = [token for token in tokens if token not in stop_words]
 
         return " ".join(tokens)
+
+        
 
     def optimize_thresholds(self, X_val: np.ndarray, y_val: np.ndarray) -> np.ndarray:
         """
@@ -115,50 +162,15 @@ class EnhancedMovieGenreClassifier:
 
         return np.array(optimal_thresholds)
 
-    def post_process_predictions(
-        self, predictions: np.ndarray, probabilities: np.ndarray
-    ) -> np.ndarray:
-        """
-        Adjust predictions based on genre relationships and confidence scores.
-        """
-        genre_names = self.mlb.classes_
-
-        for i in range(len(predictions)):
-            pred = predictions[i]
-            probs = probabilities[i]
-
-            # Apply genre relationships
-            for main_genre, related_genres in self.genre_relationships.items():
-                main_idx = np.where(genre_names == main_genre)[0]
-                if len(main_idx) == 0:  # Skip if genre not in training set
-                    continue
-                main_idx = main_idx[0]
-
-                related_idx = []
-                for g in related_genres:
-                    idx = np.where(genre_names == g)[0]
-                    if len(idx) > 0:
-                        related_idx.append(idx[0])
-
-                # If main genre is predicted with high confidence, include related genres
-                if pred[main_idx] and probs[main_idx] > 0.7:
-                    for idx in related_idx:
-                        pred[idx] = 1
-
-                # If all related genres are predicted with good confidence, include main genre
-                if related_idx and all(
-                    pred[idx] and probs[idx] > 0.6 for idx in related_idx
-                ):
-                    pred[main_idx] = 1
-
-        return predictions
-
     def train(self, df: pd.DataFrame) -> Dict[str, float]:
         """
         Train the enhanced classifier with threshold optimization.
         """
         # Prepare data
-        X = df["plot_summary"].apply(self.preprocess_text)
+        # X = df["plot_summary"].apply(self.preprocess_text)
+        X = self._parallel_batch_process(
+            df["plot_summary"], n_jobs=8, batch_size=1000
+        )
         X = self.tfidf.fit_transform(X)
 
         # Convert genre strings to lists and encode
@@ -192,9 +204,6 @@ class EnhancedMovieGenreClassifier:
         # Apply optimized thresholds
         ensemble_pred = (ensemble_probs > self.thresholds).astype(int)
 
-        # Post-process predictions
-        ensemble_pred = self.post_process_predictions(ensemble_pred, ensemble_probs)
-
         # Calculate metrics
         metrics = {
             "hamming_loss": hamming_loss(y_test, ensemble_pred),
@@ -226,9 +235,6 @@ class EnhancedMovieGenreClassifier:
         # Apply optimized thresholds
         ensemble_pred = (ensemble_probs > self.thresholds).astype(int)
 
-        # Post-process predictions
-        ensemble_pred = self.post_process_predictions(ensemble_pred, ensemble_probs)
-
         # Convert predictions to genre labels
         predicted_genres = self.mlb.inverse_transform(ensemble_pred)[0]
 
@@ -250,7 +256,6 @@ class EnhancedMovieGenreClassifier:
             "svm": self.svm,
             "rf": self.rf,
             "thresholds": self.thresholds,
-            "genre_relationships": self.genre_relationships,
         }
         with open(path, "wb") as f:
             pickle.dump(model_components, f)
@@ -267,7 +272,6 @@ class EnhancedMovieGenreClassifier:
         classifier.svm = model_components["svm"]
         classifier.rf = model_components["rf"]
         classifier.thresholds = model_components["thresholds"]
-        classifier.genre_relationships = model_components["genre_relationships"]
 
         return classifier
 

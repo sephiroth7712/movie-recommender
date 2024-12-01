@@ -63,9 +63,40 @@ class ContentBasedRecommendationService:
         genres: Optional[List[str]] = None,
     ) -> List[Dict]:
         try:
-            return self.recommender.get_movie_recommendations(
+            recommended_movies = self.recommender.get_movie_recommendations(
                 movie_id, n_recommendations, min_year, max_year, genres
             )
+
+            recommended_movie_ids = [movie_id for movie_id, _ in recommended_movies]
+
+            recommended_movies_query = select(Movie).where(
+                Movie.movie_id.in_(recommended_movie_ids)
+            )
+            result = await session.execute(recommended_movies_query)
+            recommended_movie_details = result.scalars().all()
+
+            scores_dict = dict(recommended_movies)
+
+            # Format final recommendations
+            final_recommendations = []
+            for movie in recommended_movie_details:
+                final_recommendations.append(
+                    {
+                        "movie_id": movie.movie_id,
+                        "title": movie.title,
+                        "release_year": movie.release_year,
+                        "genres": movie.genres,
+                        "runtime": movie.runtime,
+                        "plot_summary": movie.plot_summary,
+                        "similarity_score": float(scores_dict[movie.movie_id]),
+                    }
+                )
+
+            # Sort by aggregated similarity score
+            final_recommendations.sort(
+                key=lambda x: x["similarity_score"], reverse=True
+            )
+            return final_recommendations
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
 
@@ -117,9 +148,10 @@ class ContentBasedRecommendationService:
                     {
                         "movie_id": movie.movie_id,
                         "title": movie.title,
-                        "year": movie.release_year,
+                        "release_year": movie.release_year,
                         "genres": movie.genres,
                         "runtime": movie.runtime,
+                        "plot_summary": movie.plot_summary,
                         "similarity_score": float(scores_dict[movie.movie_id]),
                     }
                 )

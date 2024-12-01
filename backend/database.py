@@ -10,7 +10,7 @@ config = dotenv_values(".env")
 DATABASE_URL = f"postgresql+asyncpg://{config["DATABASE_USER"]}:{quote_plus(config["DATABASE_PASSWORD"])}@{config["DATABASE_DOMAIN"]}/{config["DATABASE_NAME"]}"
 
 # Create async engine
-engine = create_async_engine(DATABASE_URL, future=True, echo=False, poolclass=NullPool)
+engine = create_async_engine(DATABASE_URL, future=True, echo=True, poolclass=NullPool)
 
 # Create a sessionmaker for async sessions
 async_session = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
