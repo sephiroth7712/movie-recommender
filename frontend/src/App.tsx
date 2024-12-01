@@ -1,10 +1,10 @@
 // src/App.tsx
-import { useEffect } from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AppRoutes } from './routes';
-import { useAuth } from './hooks/useAuth';
-import {Circles} from 'react-loading-icons';
+import { useEffect } from "react";
+import { BrowserRouter as Router } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AppRoutes } from "./routes";
+import { useAuth } from "./hooks/useAuth";
+import { Circles } from "react-loading-icons";
 
 const queryClient = new QueryClient();
 

@@ -18,7 +18,7 @@ interface AuthState {
   login: (
     username: string,
     password: string,
-    rememberMe?: boolean
+    rememberMe?: boolean,
   ) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
@@ -48,7 +48,7 @@ export const useAuth = create<AuthState>()(
       login: async (
         username: string,
         password: string,
-        rememberMe?: boolean
+        rememberMe?: boolean,
       ) => {
         try {
           const loginData = {
@@ -96,8 +96,8 @@ export const useAuth = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Add a custom hook for protected routes

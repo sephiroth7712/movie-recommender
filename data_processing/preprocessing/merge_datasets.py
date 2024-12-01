@@ -76,7 +76,10 @@ def merge_datasets(aligned_path, processed_path, metadata_path):
     wiki_years, wiki_runtimes = load_metadata(metadata_path)
 
     # Create mapping dictionaries for faster lookups
-    processed_titles = set(processed_df["primaryTitle"].str.strip().str.lower() + processed_df["year"].astype(str))
+    processed_titles = set(
+        processed_df["primaryTitle"].str.strip().str.lower()
+        + processed_df["year"].astype(str)
+    )
 
     # Initialize list to store new entries
     new_entries = []
@@ -87,8 +90,10 @@ def merge_datasets(aligned_path, processed_path, metadata_path):
 
     # Process aligned data entries
     for _, row in aligned_df.iterrows():
-        movie_name = row["movie_name"].lower() + str(int(wiki_years.get(row["wikipedia_movie_id"], None)))
-        if(row["movie_name"]) == "Sabrina":
+        movie_name = row["movie_name"].lower() + str(
+            int(wiki_years.get(row["wikipedia_movie_id"], None))
+        )
+        if (row["movie_name"]) == "Sabrina":
             print(movie_name)
 
         if movie_name not in processed_titles:
@@ -138,7 +143,9 @@ def merge_datasets(aligned_path, processed_path, metadata_path):
     else:
         final_df = merged_df
 
-    final_df["title_year"] = final_df["primaryTitle"].str.strip().str.lower() + final_df["year"].astype(str)
+    final_df["title_year"] = final_df[
+        "primaryTitle"
+    ].str.strip().str.lower() + final_df["year"].astype(str)
     final_df = final_df.drop_duplicates(subset=["title_year"])
     final_df = final_df.drop("title_year", axis=1)
 

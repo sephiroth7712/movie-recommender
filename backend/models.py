@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, Float, Text, ForeignKey, UniqueConstraint, Index, Boolean
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    Text,
+    ForeignKey,
+    UniqueConstraint,
+    Index,
+    Boolean,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -29,9 +39,10 @@ class Movie(Base):
     tmdb_id = Column(String, nullable=True)
 
     __table_args__ = (
-        Index('idx_movie_title', title),
-        Index('idx_movie_year', release_year),
+        Index("idx_movie_title", title),
+        Index("idx_movie_year", release_year),
     )
+
 
 # Rating Model
 class Rating(Base):

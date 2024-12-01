@@ -5,7 +5,9 @@ interface GenrePredictionsProps {
   predictions: GenrePrediction[];
 }
 
-export default function GenrePredictions({ predictions }: GenrePredictionsProps) {
+export default function GenrePredictions({
+  predictions,
+}: GenrePredictionsProps) {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -13,7 +15,7 @@ export default function GenrePredictions({ predictions }: GenrePredictionsProps)
       </h3>
       <div className="space-y-2">
         {predictions.map((prediction) => (
-          <div 
+          <div
             key={prediction.genre}
             className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700"
           >

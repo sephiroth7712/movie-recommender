@@ -22,7 +22,7 @@ export interface RecommendationsResponse {
 
 export const recommendationService = {
   async getUserRecommendations(
-    data: UserRecommendationsRequest
+    data: UserRecommendationsRequest,
   ): Promise<RecommendationsResponse> {
     const params = {
       n_recommendations: data.n_recommendations,
@@ -30,20 +30,20 @@ export const recommendationService = {
     };
     const response = await axios.get(
       `${API_URL}/users/${data.userId}/recommendations`,
-      { params }
+      { params },
     );
     return response.data;
   },
 
   async getSimilarMovies(
-    data: SimilarMoviesRequest
+    data: SimilarMoviesRequest,
   ): Promise<RecommendationsResponse> {
     const params = {
       n_recommendations: data.n_recommendations,
     };
     const response = await axios.get(
       `${API_URL}/movies/${data.movie_id}/recommendations`,
-      { params }
+      { params },
     );
     return response.data;
   },

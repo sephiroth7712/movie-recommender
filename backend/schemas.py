@@ -59,9 +59,11 @@ class RatingResponse(RatingBase):
 class GenreClassificationRequest(BaseModel):
     plot_summary: str
 
+
 class GenrePrediction(BaseModel):
     genre: str
     confidence: float
+
 
 class GenreClassificationResponse(GenreClassificationRequest):
     predictions: List[GenrePrediction]

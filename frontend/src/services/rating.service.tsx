@@ -13,10 +13,10 @@ export interface SubmitRatingResponse {
 }
 
 export interface Rating {
-    rating_id: number;
-    movie_id: number;
-    user_id: number;
-    rating: number;
+  rating_id: number;
+  movie_id: number;
+  user_id: number;
+  rating: number;
 }
 
 export const ratingService = {
@@ -30,13 +30,15 @@ export const ratingService = {
 
   async getRatingByUserForMovie(
     movie_id: string,
-    user_id: string
+    user_id: string,
   ): Promise<Rating> {
     const params = {
       movie_id,
       user_id,
     };
-    const response = await axios.get<Rating[]>(`${API_URL}/ratings/`, { params });
+    const response = await axios.get<Rating[]>(`${API_URL}/ratings/`, {
+      params,
+    });
     return response.data[0];
   },
 };

@@ -13,7 +13,9 @@ const Register = lazy(() => import("./pages/auth/Register"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 // const Profile = lazy(() => import("./pages/Profile"));
 const MovieDetail = lazy(() => import("./pages/MovieDetail"));
-const MovieGenreClassification = lazy(() => import("./pages/GenreClassification"));
+const MovieGenreClassification = lazy(
+  () => import("./pages/GenreClassification"),
+);
 const Watchlist = lazy(() => import("./pages/Watchlist"));
 
 export function AppRoutes() {

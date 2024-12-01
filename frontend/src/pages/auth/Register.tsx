@@ -51,7 +51,7 @@ export default function Register() {
       setError(
         err instanceof Error
           ? err.message
-          : "An error occurred during registration. Please try again."
+          : "An error occurred during registration. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -81,7 +81,6 @@ export default function Register() {
       {/* Registration Form */}
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-
           {/* Email Field */}
           <div>
             <label

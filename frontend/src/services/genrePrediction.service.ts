@@ -17,8 +17,13 @@ export interface GenrePredictionResponse {
 }
 
 class GenreClassificationService {
-  async predictGenres(request: GenrePredictionRequest): Promise<GenrePredictionResponse> {
-    const response = await axios.post<GenrePredictionResponse>(`${API_URL}/classify`, request);
+  async predictGenres(
+    request: GenrePredictionRequest,
+  ): Promise<GenrePredictionResponse> {
+    const response = await axios.post<GenrePredictionResponse>(
+      `${API_URL}/classify`,
+      request,
+    );
     return response.data;
   }
 }

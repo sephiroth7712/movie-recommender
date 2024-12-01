@@ -12,8 +12,7 @@ export default function MovieLoadingCard() {
         {[...Array(4)].map((_) => (
           <span
             className={`w-10 h-5 bg-gray-200 font-medium me-2 px-2.5 py-0.5 rounded`}
-          >
-          </span>
+          ></span>
         ))}
       </div>
       <span className="sr-only">Loading...</span>

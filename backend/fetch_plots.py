@@ -70,7 +70,7 @@ async def get_movies_without_plot():
         query = select(Movie.tmdb_id).where(Movie.plot_summary == "")
         result = await session.execute(query)
         # Get all IDs and filter out None and nan values
-        ids = [row[0] for row in result.fetchall() if row[0] != 'nan']
+        ids = [row[0] for row in result.fetchall() if row[0] != "nan"]
         ids = [x for x in ids if not pd.isna(x)]  # Remove any nan values
         print("Sample TMDb IDs from database:", ids[:5] if ids else "No IDs found")
         return ids
@@ -101,8 +101,8 @@ async def main():
 
     # Convert id column to integer
     df["id"] = pd.to_numeric(df["id"], errors="coerce")
-    df = df.dropna(subset=['id'])
-    df['id'] = df['id'].astype(int)
+    df = df.dropna(subset=["id"])
+    df["id"] = df["id"].astype(int)
 
     # Print sample IDs from CSV for debugging
     print("Sample IDs from CSV:", df["id"].head().tolist())
@@ -114,7 +114,9 @@ async def main():
     print("Length of movies without plot:", len(movies_to_update))
 
     # Convert movies_to_update to same type as df['id']
-    movies_to_update = [int(x) for x in movies_to_update if pd.notna(x) and str(x).strip()]
+    movies_to_update = [
+        int(x) for x in movies_to_update if pd.notna(x) and str(x).strip()
+    ]
 
     # Filter dataframe to only include movies we need to update
     df_to_update = df[df["id"].isin(movies_to_update)]

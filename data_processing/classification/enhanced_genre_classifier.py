@@ -108,14 +108,14 @@ class EnhancedMovieGenreClassifier:
         # Convert to lowercase and remove special characters
         text = text.lower()
         text = re.sub(r"[^a-zA-Z\s]", "", text)
-        
+
         tokens = []
         doc = self.nlp(text)
 
         for token in doc:
             if token.pos_ not in ["PROPN", "PRON"]:
                 tokens.append(token.lemma_)
-        
+
         text = " ".join(tokens)
 
         # Tokenize and lemmatize
@@ -127,8 +127,6 @@ class EnhancedMovieGenreClassifier:
         tokens = [token for token in tokens if token not in stop_words]
 
         return " ".join(tokens)
-
-        
 
     def optimize_thresholds(self, X_val: np.ndarray, y_val: np.ndarray) -> np.ndarray:
         """
@@ -168,9 +166,7 @@ class EnhancedMovieGenreClassifier:
         """
         # Prepare data
         # X = df["plot_summary"].apply(self.preprocess_text)
-        X = self._parallel_batch_process(
-            df["plot_summary"], n_jobs=8, batch_size=1000
-        )
+        X = self._parallel_batch_process(df["plot_summary"], n_jobs=8, batch_size=1000)
         X = self.tfidf.fit_transform(X)
 
         # Convert genre strings to lists and encode

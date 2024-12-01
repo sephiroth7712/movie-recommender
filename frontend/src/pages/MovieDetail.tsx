@@ -15,7 +15,7 @@ import Rating from "../components/common/Rating";
 export default function MovieDetail() {
   const { id } = useParams();
   const { user } = useAuth();
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   const [movie, setMovie] = useState<Movie>();
   const [isMovieLoading, setIsMovieLoading] = useState(true);
   const [similarMovies, setSimilarMovies] = useState<RecommendationsResponse>();
@@ -54,7 +54,7 @@ export default function MovieDetail() {
       setIsRatingLoading(true);
       const rating = await ratingService.getRatingByUserForMovie(
         movie_id,
-        user_id
+        user_id,
       );
       setUserRating(rating?.rating || 0);
       setIsRatingLoading(false);
@@ -76,7 +76,7 @@ export default function MovieDetail() {
       };
 
       await ratingService.submitRating(request);
-      navigate(0)
+      navigate(0);
       setUserRating(newRating);
     } catch (error) {
       alert("Error updating rating: " + error);

@@ -53,6 +53,7 @@ def print_genre_stats(stats_df: pd.DataFrame) -> None:
     print("-" * 50)
     print(stats_df.tail().to_string())
 
+
 def get_genre_distribution():
     file_path = (
         DATASETS_PROCESSED
@@ -73,7 +74,6 @@ def get_genre_distribution():
         print(f"\nGenres with less than {threshold} movies:")
         print("=" * 50)
         print(low_count_genres.to_string())
-
 
         # Save statistics to CSV
         output_file = DATASETS_PROCESSED + "/genre_distribution.csv"

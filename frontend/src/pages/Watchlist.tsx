@@ -13,7 +13,7 @@ export default function Recommendation() {
   const fetchMovies = async (user: User) => {
     setIsLoading(true);
     const moviePromises = user.movies_watched.map(async (movie_id) =>
-      movieService.getMovie(movie_id.toString())
+      movieService.getMovie(movie_id.toString()),
     );
     const movies = await Promise.all(moviePromises);
 
