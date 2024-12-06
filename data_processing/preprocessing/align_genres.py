@@ -35,14 +35,6 @@ def load_and_process_data(mapping_file):
         lambda x: [g.lower().strip() for g in x]
     )
 
-    # Print all unique genres before mapping (for debugging)
-    # print("All unique genres before mapping:")
-    # unique_genres = set()
-    # for genres in genre_df["genres"]:
-    #     unique_genres.update(genres)
-    # for genre in sorted(unique_genres):
-    #     print(f"'{genre}'")
-
     # Count original genres distribution
     all_genres = []
     for genres in genre_df["genres"]:
@@ -56,11 +48,6 @@ def load_and_process_data(mapping_file):
     def find_matching_genre(genre):
         # Convert input genre to lowercase and strip
         genre = genre.lower().strip()
-
-        # Debug print for problematic genre
-        # if "clef" in genre:
-        # print(f"Processing genre: '{genre}'")
-        # print(f"Available mappings: {genre_mapping}")
 
         # Check if genre exists in our mapping
         if genre in genre_mapping:
@@ -92,12 +79,6 @@ def load_and_process_data(mapping_file):
     print("\nNew genre distribution after mapping:")
     for genre, count in new_genre_dist.most_common():
         print(f"{genre}: {count}")
-
-    # Print summary of applied mappings
-    # print("\nApplied genre mappings:")
-    # for old_genre in original_genre_dist:
-    #     if old_genre in genre_mapping:
-    #         print(f"{old_genre} -> {genre_mapping[old_genre]}")
 
     # Print summary statistics
     print(f"\nOriginal number of movies: {len(genre_df)}")

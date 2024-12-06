@@ -27,15 +27,18 @@ export default function Dashboard() {
         const results =
           await recommendationService.getUserRecommendations(data);
         if (type === "cbf") {
-          setIsCBFLoading(false);
           setCBFResponse(results);
         } else {
-          setIsCoBFLoading(false);
           setCoBFResponse(results);
         }
       }
     } catch (error) {
-      alert(error);
+      console.log(error);
+    }
+    if (type === "cbf") {
+      setIsCBFLoading(false);
+    } else {
+      setIsCoBFLoading(false);
     }
   };
 

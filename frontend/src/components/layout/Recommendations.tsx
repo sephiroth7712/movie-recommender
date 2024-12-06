@@ -49,7 +49,8 @@ export default function Recommendation({
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {!isLoading &&
-          movies?.recommendations.map((movie) => (
+          movies &&
+          movies.recommendations.map((movie) => (
             <MovieCard
               movie_id={movie.movie_id}
               title={movie.title}
@@ -61,6 +62,11 @@ export default function Recommendation({
           ))}
         {isLoading && [...Array(4)].map((_, i) => <MovieLoadingCard key={i} />)}
       </div>
+      {!isLoading && (!movies || movies.recommendations.length === 0) && (
+        <span className="font-semibold text-red-800 flex items-center justify-center">
+          <div>{"Please rate at least 1 movie"}</div>
+        </span>
+      )}
     </section>
   );
 }

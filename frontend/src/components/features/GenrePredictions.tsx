@@ -10,7 +10,7 @@ export default function GenrePredictions({
 }: GenrePredictionsProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+      <h3 className="text-lg font-semibold text-gray-900">
         Predicted Genres
       </h3>
       <div className="space-y-2">

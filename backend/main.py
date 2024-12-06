@@ -1,10 +1,7 @@
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Query, BackgroundTasks
-from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
-from jose import JWTError, jwt
-from datetime import timedelta, datetime
-from database import get_db, config
+from database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, engine
 from models import Base
@@ -23,7 +20,6 @@ from schemas import (
 )
 from database import engine
 from models import Base
-from datetime import datetime, timedelta, timezone
 from content_based_recommendation_service import ContentBasedRecommendationService
 from collaborative_recommendation_service import CollaborativeRecommendationService
 from genre_prediction_service import GenrePredictionService
@@ -36,17 +32,6 @@ app.add_middleware(
 cbf_recommender_service = ContentBasedRecommendationService()
 cobf_recommender_service = CollaborativeRecommendationService()
 genre_prediction_service = GenrePredictionService()
-
-
-def create_access_token(data: dict, expires_delta: timedelta):
-    to_encode = data.copy()
-    # Use timezone-aware UTC datetime
-    expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(
-        to_encode, config["SECRET_KEY"], algorithm=config["ALGORITHM"]
-    )
-    return encoded_jwt
 
 
 # Create tables
@@ -70,7 +55,7 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     return await crud.create_user(db, user)
 
 
-@app.get("/users/{userid}", response_model=UserResponse)
+@app.get("/users/{user_id}", response_model=UserResponse)
 async def create_user(user_id: int, db: AsyncSession = Depends(get_db)):
     return await crud.get_user(db, user_id)
 
@@ -87,33 +72,6 @@ async def login(form_data: UserCreate, db: AsyncSession = Depends(get_db)):
         )
 
     return user
-
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
-
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
-):
-    try:
-        payload = jwt.decode(
-            token, config["SECRET_KEY"], algorithms=[config["ALGORITHM"]]
-        )
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-            )
-        user = await get_user_by_username(db, username)
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-            )
-        return user
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
 
 
 # Movie Routes

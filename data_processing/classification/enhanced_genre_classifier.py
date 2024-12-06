@@ -62,7 +62,7 @@ class EnhancedMovieGenreClassifier:
         for doc in self.nlp.pipe(texts, batch_size=100):
             tokens = []
             for token in doc:
-                if token.pos_ not in ["PROPN", "PRON"]:
+                if not token.ent_type_ and token.pos_ not in ["PROPN", "PRON"]:
                     tokens.append(token.lemma_)
             text = " ".join(tokens)
 
@@ -113,7 +113,7 @@ class EnhancedMovieGenreClassifier:
         doc = self.nlp(text)
 
         for token in doc:
-            if token.pos_ not in ["PROPN", "PRON"]:
+            if not token.ent_type_ and token.pos_ not in ["PROPN", "PRON"]:
                 tokens.append(token.lemma_)
 
         text = " ".join(tokens)
@@ -165,7 +165,6 @@ class EnhancedMovieGenreClassifier:
         Train the enhanced classifier with threshold optimization.
         """
         # Prepare data
-        # X = df["plot_summary"].apply(self.preprocess_text)
         X = self._parallel_batch_process(df["plot_summary"], n_jobs=8, batch_size=1000)
         X = self.tfidf.fit_transform(X)
 

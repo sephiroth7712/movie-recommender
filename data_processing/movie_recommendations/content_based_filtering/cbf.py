@@ -61,7 +61,7 @@ class ContentBasedRecommender:
         for doc in self.nlp.pipe(texts, batch_size=100):
             tokens = []
             for token in doc:
-                if token.pos_ not in ["PROPN", "PRON"]:
+                if not token.ent_type_ and token.pos_ not in ["PROPN", "PRON"]:
                     tokens.append(token.lemma_)
             processed.append(" ".join(tokens))
         return processed
@@ -112,7 +112,7 @@ class ContentBasedRecommender:
         content_parts.extend([genres] * 2)
 
         # Add processed plot (5x weight)
-        content_parts.extend([processed_plot] * 5)
+        content_parts.extend([processed_plot] * 3)
 
         # Add decade (1x weight)
         content_parts.append(decade)
@@ -297,57 +297,3 @@ class ContentBasedRecommender:
         if not recommended_movie_ids:
             return []
         return recommended_movie_ids
-
-
-# # Example usage
-# if __name__ == "__main__":
-#     try:
-#         # Load movies DataFrame
-#         movies_df = pd.read_csv("F:\Data Science Project\movie-recommender\data_processing\datasets\datasets\processed_data\merged_movies_dataset.csv")
-#         print("Movie Recommendation System")
-#         print("-" * 30)
-
-#         # Initialize recommender
-#         recommender = ContentBasedRecommender(movies_df)
-
-#         # Get movie title from user
-#         movie_title = input("\nEnter a movie title: ")
-
-#         # Find the movie in the dataset
-#         movie_mask = movies_df['title'].str.lower() == movie_title.lower()
-#         if not any(movie_mask):
-#             print(f"\nMovie '{movie_title}' not found!")
-#             # Show similar titles
-#             similar_titles = movies_df[movies_df['title'].str.lower().str.contains(movie_title.lower())]
-#             if not similar_titles.empty:
-#                 print("\nDid you mean one of these?")
-#                 for title in similar_titles['title'].head():
-#                     print(f"- {title}")
-#             exit()
-
-#         # Get the movie ID and details
-#         sample_movie_id = movies_df[movie_mask]['movieId'].iloc[0]
-#         sample_movie = movies_df[movie_mask].iloc[0]
-#         print(f"\nFinding movies similar to: {sample_movie['title']} ({sample_movie['year']})")
-#         print(f"Genres: {sample_movie['genres']}")
-#         print("-" * 30)
-
-#         # Get recommendations
-#         recommendations = recommender.get_movie_recommendations(
-#             movie_id=sample_movie_id,
-#             n_recommendations=4,
-#             min_year=None,
-#             genres=None
-#         )
-
-#         # Print recommendations
-#         print("\nRecommended Movies:")
-#         print("-" * 30)
-#         for rec in recommendations:
-#             print(f"{rec['title']} ({rec['year']})")
-#             print(f"Genres: {rec['genres']}")
-#             print(f"Similarity: {rec['similarity_score']:.3f}")
-#             print()
-
-#     except Exception as e:
-#         print(f"Error: {str(e)}")
